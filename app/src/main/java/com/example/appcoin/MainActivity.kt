@@ -14,6 +14,7 @@ import android.support.v7.widget.GridLayoutManager
 import android.support.v7.widget.Toolbar
 import android.view.Menu
 import com.example.appcoin.adapter.CoinAdapter
+import com.example.appcoin.data.DataBase
 import com.example.appcoin.models.Coin
 import com.example.appcoin.network.CoinSerializer
 import com.example.appcoin.network.NetworkUtils
@@ -23,8 +24,16 @@ import org.json.JSONObject
 
 class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
 
+    var dbHelper = DataBase(this)
+
     lateinit var viewAdapter: CoinAdapter
+    lateinit var mAdapter: CoinAdapter
     lateinit var viewManager: GridLayoutManager
+
+    override fun onDestroy() {
+        dbHelper.close()
+        super.onDestroy()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +55,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         toggle.syncState()
 
         navView.setNavigationItemSelectedListener(this)
-
+    //--- Manejo de las view y acceso a la api ---------------------------------
         viewManager = GridLayoutManager(this,2)
         viewAdapter = CoinAdapter(listOf<Coin>()) {
             Snackbar.make(rv_moneda,
@@ -61,8 +70,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         }
 
         FetchCoin().execute()
+    //-----------------------------------------------------------------------
     }
-
+    //--- Accediendo a la api -----------------------------------------------
     private inner class FetchCoin : AsyncTask<Unit, Unit, List<Coin>>(){
 
         override fun doInBackground(vararg params: Unit?): List<Coin> {
@@ -92,6 +102,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         }
 
     }
+    //--------------------------------------------------------------------
 
     override fun onBackPressed() {
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
