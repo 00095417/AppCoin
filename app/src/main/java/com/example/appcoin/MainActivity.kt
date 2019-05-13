@@ -1,7 +1,9 @@
 package com.example.appcoin
 
+import android.content.ContentValues
 import android.os.AsyncTask
 import android.os.Bundle
+import android.provider.BaseColumns
 import android.support.design.widget.FloatingActionButton
 import android.support.design.widget.Snackbar
 import android.support.v4.view.GravityCompat
@@ -15,6 +17,7 @@ import android.support.v7.widget.Toolbar
 import android.view.Menu
 import com.example.appcoin.adapter.CoinAdapter
 import com.example.appcoin.data.DataBase
+import com.example.appcoin.data.DatabaseCoin
 import com.example.appcoin.models.Coin
 import com.example.appcoin.network.CoinSerializer
 import com.example.appcoin.network.NetworkUtils
@@ -27,7 +30,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     var dbHelper = DataBase(this)
 
     lateinit var viewAdapter: CoinAdapter
-    lateinit var mAdapter: CoinAdapter
     lateinit var viewManager: GridLayoutManager
 
     override fun onDestroy() {
@@ -55,6 +57,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         toggle.syncState()
 
         navView.setNavigationItemSelectedListener(this)
+
     //--- Manejo de las view y acceso a la api ---------------------------------
         viewManager = GridLayoutManager(this,2)
         viewAdapter = CoinAdapter(listOf<Coin>()) {
@@ -82,14 +85,66 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
             val resultJSON = JSONObject(resultString)
 
-            return if (resultJSON.getBoolean("success")) {
-                CoinSerializer.parseCoins(
-                    resultJSON.getJSONArray("docs").toString()
-                )
-            } else {
-                listOf<Coin>()
+            //--- Guardando los datos en la db--------------------------------
+            val db = dbHelper.writableDatabase
+            val values = ContentValues()
+
+            val infoApi = if (resultJSON.getBoolean("success")) {
+                                CoinSerializer.parseCoins(
+                                resultJSON.getJSONArray("docs").toString()
+                                )
+                          } else {
+                            listOf<Coin>()
+                          }
+            for (i in infoApi){
+                values.apply {
+                    put(DatabaseCoin.CoinEntry.COLUMN_COINNAME,i.name)
+                    put(DatabaseCoin.CoinEntry.COLUMN_COUNTRY,i.country)
+                    put(DatabaseCoin.CoinEntry.COLUMN_YEAR,i.year)
+                }
+
+                db?.insert(DatabaseCoin.CoinEntry.TABLE_NAME, null, values)
             }
+            //------------------------------------------------------------------------------
+
+            return readCoin()
         }
+        //---Obteniendo los datos de la db -----------------------------------
+        private fun readCoin(): List<Coin>{
+
+            val db = dbHelper.readableDatabase
+            val projection = arrayOf(
+                DatabaseCoin.CoinEntry.COLUMN_COINNAME,
+                DatabaseCoin.CoinEntry.COLUMN_COUNTRY,
+                DatabaseCoin.CoinEntry.COLUMN_YEAR
+            )
+
+            val cursor = db.query(
+                DatabaseCoin.CoinEntry.TABLE_NAME, // nombre de la tabla
+                projection, // columnas que se devolverán
+                null, // Columns where clausule
+                null, // values Where clausule
+                null, // Do not group rows
+                null, // do not filter by row
+                null // sort order
+            )
+
+            val lista = mutableListOf<Coin>()
+
+            with(cursor) {
+                while (moveToNext()) {
+                    val coin = Coin(
+                        getString(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_COINNAME)),
+                        getString(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_COUNTRY)),
+                        getInt(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_YEAR))
+                    )
+                    lista.add(coin)
+                }
+            }
+
+            return lista
+        }
+        //----------------------------------------------------------------------------------------
 
         override fun onPostExecute(result: List<Coin>) {
             if (result.isNotEmpty()) {
@@ -103,6 +158,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     }
     //--------------------------------------------------------------------
+
+
 
     override fun onBackPressed() {
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)

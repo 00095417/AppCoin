@@ -19,7 +19,7 @@ class CoinSerializer {
             val coinJSON = JSONObject(coinText)
 
             return with(coinJSON) {
-                Coin(getString("name"),getString("country"),getInt("year"),getString("img"))
+                Coin(getString("name"),getString("country"),getInt("year"))
             }
         }
     }
