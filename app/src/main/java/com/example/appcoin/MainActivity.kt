@@ -43,7 +43,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setSupportActionBar(toolbar)
 
         val fab: FloatingActionButton = findViewById(R.id.fab)
-
+        fab.apply{}
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
         val navView: NavigationView = findViewById(R.id.nav_view)
         val toggle = ActionBarDrawerToggle(
@@ -62,22 +62,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             adapter = viewAdapter
             layoutManager = viewManager
         }
-        FetchCoin().execute()
 
-        fab.apply{
-            setOnClickListener{
-
-                val db = dbHelper.writableDatabase
-                db.execSQL("DELETE FROM monedas WHERE country='El Salvador'")
-
-                viewAdapter.setData(readCoin())
-
-                rv_moneda.apply {
-                    adapter = viewAdapter
-                    layoutManager = viewManager
-                }
-            }
+        if (readCoin().isEmpty()){
+            FetchCoin().execute()
+        }else{
+            viewAdapter.setData(readCoin())
         }
+
     //-----------------------------------------------------------------------
     }
     //--- Accediendo a la api -----------------------------------------------
