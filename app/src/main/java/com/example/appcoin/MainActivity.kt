@@ -3,7 +3,6 @@ package com.example.appcoin
 import android.content.ContentValues
 import android.os.AsyncTask
 import android.os.Bundle
-import android.provider.BaseColumns
 import android.support.design.widget.FloatingActionButton
 import android.support.design.widget.Snackbar
 import android.support.v4.view.GravityCompat
@@ -44,10 +43,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setSupportActionBar(toolbar)
 
         val fab: FloatingActionButton = findViewById(R.id.fab)
-        fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null).show()
-        }
+
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
         val navView: NavigationView = findViewById(R.id.nav_view)
         val toggle = ActionBarDrawerToggle(
@@ -60,19 +56,28 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     //--- Manejo de las view y acceso a la api ---------------------------------
         viewManager = GridLayoutManager(this,2)
-        viewAdapter = CoinAdapter(listOf<Coin>()) {
-            Snackbar.make(rv_moneda,
-                "CLick en " + it.name,
-                Snackbar.LENGTH_SHORT)
-                .show()
-        }
+        viewAdapter = CoinAdapter(listOf<Coin>()) {}
 
         rv_moneda.apply {
             adapter = viewAdapter
             layoutManager = viewManager
         }
-
         FetchCoin().execute()
+
+        fab.apply{
+            setOnClickListener{
+
+                val db = dbHelper.writableDatabase
+                db.execSQL("DELETE FROM monedas WHERE country='El Salvador'")
+
+                viewAdapter.setData(readCoin())
+
+                rv_moneda.apply {
+                    adapter = viewAdapter
+                    layoutManager = viewManager
+                }
+            }
+        }
     //-----------------------------------------------------------------------
     }
     //--- Accediendo a la api -----------------------------------------------
@@ -85,66 +90,16 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
             val resultJSON = JSONObject(resultString)
 
-            //--- Guardando los datos en la db--------------------------------
-            val db = dbHelper.writableDatabase
-            val values = ContentValues()
-
             val infoApi = if (resultJSON.getBoolean("success")) {
-                                CoinSerializer.parseCoins(
-                                resultJSON.getJSONArray("docs").toString()
-                                )
-                          } else {
-                            listOf<Coin>()
-                          }
-            for (i in infoApi){
-                values.apply {
-                    put(DatabaseCoin.CoinEntry.COLUMN_COINNAME,i.name)
-                    put(DatabaseCoin.CoinEntry.COLUMN_COUNTRY,i.country)
-                    put(DatabaseCoin.CoinEntry.COLUMN_YEAR,i.year)
-                }
-
-                db?.insert(DatabaseCoin.CoinEntry.TABLE_NAME, null, values)
-            }
-            //------------------------------------------------------------------------------
-
-            return readCoin()
-        }
-        //---Obteniendo los datos de la db -----------------------------------
-        private fun readCoin(): List<Coin>{
-
-            val db = dbHelper.readableDatabase
-            val projection = arrayOf(
-                DatabaseCoin.CoinEntry.COLUMN_COINNAME,
-                DatabaseCoin.CoinEntry.COLUMN_COUNTRY,
-                DatabaseCoin.CoinEntry.COLUMN_YEAR
-            )
-
-            val cursor = db.query(
-                DatabaseCoin.CoinEntry.TABLE_NAME, // nombre de la tabla
-                projection, // columnas que se devolverán
-                null, // Columns where clausule
-                null, // values Where clausule
-                null, // Do not group rows
-                null, // do not filter by row
-                null // sort order
-            )
-
-            val lista = mutableListOf<Coin>()
-
-            with(cursor) {
-                while (moveToNext()) {
-                    val coin = Coin(
-                        getString(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_COINNAME)),
-                        getString(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_COUNTRY)),
-                        getInt(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_YEAR))
-                    )
-                    lista.add(coin)
-                }
+                CoinSerializer.parseCoins(
+                    resultJSON.getJSONArray("docs").toString()
+                )
+            } else {
+                listOf<Coin>()
             }
 
-            return lista
+            return writeCoin(infoApi)
         }
-        //----------------------------------------------------------------------------------------
 
         override fun onPostExecute(result: List<Coin>) {
             if (result.isNotEmpty()) {
@@ -158,8 +113,55 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     }
     //--------------------------------------------------------------------
+    fun writeCoin(listCoin:List<Coin>):List<Coin>{
+        val db = dbHelper.writableDatabase
+        val values = ContentValues()
 
+        for (i in listCoin){
+            values.apply {
+                put(DatabaseCoin.CoinEntry.COLUMN_COINNAME,i.name)
+                put(DatabaseCoin.CoinEntry.COLUMN_COUNTRY,i.country)
+                put(DatabaseCoin.CoinEntry.COLUMN_YEAR,i.year)
+            }
 
+            db?.insert(DatabaseCoin.CoinEntry.TABLE_NAME, null, values)
+        }
+        return readCoin()
+    }
+
+    fun readCoin(): List<Coin>{
+
+        val db = dbHelper.readableDatabase
+        val projection = arrayOf(
+            DatabaseCoin.CoinEntry.COLUMN_COINNAME,
+            DatabaseCoin.CoinEntry.COLUMN_COUNTRY,
+            DatabaseCoin.CoinEntry.COLUMN_YEAR
+        )
+
+        val cursor = db.query(
+            DatabaseCoin.CoinEntry.TABLE_NAME, // nombre de la tabla
+            projection, // columnas que se devolverán
+            null, // Columns where clausule
+            null, // values Where clausule
+            null, // Do not group rows
+            null, // do not filter by row
+            null // sort order
+        )
+
+        val lista = mutableListOf<Coin>()
+
+        with(cursor) {
+            while (moveToNext()) {
+                val coin = Coin(
+                    getString(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_COINNAME)),
+                    getString(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_COUNTRY)),
+                    getInt(getColumnIndexOrThrow(DatabaseCoin.CoinEntry.COLUMN_YEAR))
+                )
+                lista.add(coin)
+            }
+        }
+        return lista
+    }
 
     override fun onBackPressed() {
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
